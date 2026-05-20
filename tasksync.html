@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskSync - 实时任务协作</title>
+<style>
+:root {
+  --primary: #4F46E5; --primary-dark: #3730A3;
+  --success: #10B981; --warning: #F59E0B; --danger: #EF4444;
+  --bg: #F8FAFC; --border: #E2E8F0;
+  --text: #1E293B; --muted: #64748B;
+  --shadow: 0 1px 3px rgba(0,0,0,.1); --shadow-md: 0 4px 12px rgba(0,0,0,.1);
+  --r: 8px; --font: 'Segoe UI',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
+.screen{display:none}.screen.active{display:flex}
+/* Welcome */
+#welcome-screen{min-height:100vh;align-items:center;justify-content:center;background:linear-gradient(135deg,#667eea,#764ba2)}
+.auth-card{background:#fff;border-radius:16px;padding:36px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.auth-card h1{font-size:1.7rem;font-weight:700;margin-bottom:4px}
+.auth-card .sub{color:var(--muted);margin-bottom:22px;font-size:.88rem}
+.fg{margin-bottom:13px}
+.fg label{display:block;font-size:.83rem;font-weight:500;margin-bottom:4px}
+.fg input,.fg select,.fg textarea{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--r);font-size:.9rem;font-family:var(--font);transition:border .2s}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--primary)}
+.fg textarea{resize:vertical;min-height:70px}
+.btn{padding:9px 18px;border:none;border-radius:var(--r);font-size:.9rem;font-weight:500;cursor:pointer;font-family:var(--font);transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--primary);color:#fff;width:100%;justify-content:center}.btn-primary:hover{background:var(--primary-dark)}
+.btn-secondary{background:var(--bg);color:var(--text);border:1.5px solid var(--border)}.btn-secondary:hover{background:var(--border)}
+.btn-success{background:var(--success);color:#fff}.btn-danger{background:var(--danger);color:#fff}
+.btn-sm{padding:5px 11px;font-size:.82rem;width:auto}
+.divider{display:flex;align-items:center;gap:10px;margin:12px 0;color:var(--muted);font-size:.82rem}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.tabs{display:flex;border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:18px}
+.tab-btn{flex:1;padding:9px;border:none;background:#fff;cursor:pointer;font-size:.88rem;font-family:var(--font)}
+.tab-btn.active{background:var(--primary);color:#fff;font-weight:500}
+.tab-panel{display:none}.tab-panel.active{display:block}
+.conn-status{display:flex;align-items:center;gap:6px;font-size:.8rem;margin-bottom:16px;padding:7px 12px;border-radius:var(--r);background:var(--bg)}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:#ccc}
+.conn-dot.connected{background:var(--success)}.conn-dot.connecting{background:var(--warning);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+/* App */
+#app-screen{flex-direction:column;min-height:100vh}
+.app-header{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;height:58px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow)}
+.logo{font-weight:700;font-size:1.05rem;color:var(--primary);white-space:nowrap}
+.room-tag{display:flex;align-items:center;gap:6px;padding:3px 11px;background:var(--bg);border-radius:20px;font-size:.82rem;cursor:pointer;white-space:nowrap}
+.room-tag strong{color:var(--primary)}
+.h-spacer{flex:1}
+.global-timer{display:flex;align-items:center;gap:6px;padding:4px 13px;background:var(--primary);color:#fff;border-radius:20px;font-size:.82rem;font-family:monospace;white-space:nowrap}
+.prog-wrap{display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--muted)}
+.prog-bar{width:70px;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;background:var(--success);border-radius:3px;transition:width .3s}
+.user-tag{display:flex;align-items:center;gap:7px;padding:3px 11px;background:var(--bg);border-radius:20px;font-size:.82rem;white-space:nowrap}
+.avatar{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;color:#fff;flex-shrink:0}
+.badge{background:var(--primary);color:#fff;padding:1px 6px;border-radius:10px;font-size:.68rem}
+.app-body{display:flex;flex:1;overflow:hidden}
+.sidebar{width:220px;background:#fff;border-right:1px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;flex-shrink:0}
+.s-title{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:10px 8px 4px}
+.s-item{padding:7px 11px;border-radius:var(--r);cursor:pointer;font-size:.88rem;color:var(--muted);display:flex;align-items:center;gap:7px}
+.s-item:hover,.s-item.active{background:#EEF2FF;color:var(--primary)}
+.s-count{margin-left:auto;background:var(--border);color:var(--muted);border-radius:10px;padding:1px 6px;font-size:.72rem}
+.member-item{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:var(--r);font-size:.83rem}
+.online-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-left:auto}
+.online-dot.on{background:var(--success)}.online-dot.off{background:#cbd5e1}
+.main-content{flex:1;padding:20px;overflow-y:auto}
+.content-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.content-header h2{font-size:1.1rem;font-weight:600}
+.tasks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+/* Task card */
+.task-card{background:#fff;border-radius:12px;padding:14px;box-shadow:var(--shadow);border:1.5px solid transparent;cursor:pointer;transition:all .2s}
+.task-card:hover{box-shadow:var(--shadow-md);border-color:var(--primary);transform:translateY(-1px)}
+.task-card.s-completed{border-color:var(--success);opacity:.75}
+.task-card.s-in_progress{border-color:var(--warning)}
+.task-card.s-overdue{border-color:var(--danger);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:var(--shadow)}50%{box-shadow:0 0 0 3px rgba(239,68,68,.2)}}
+.tc-head{display:flex;align-items:flex-start;gap:7px;margin-bottom:7px}
+.tc-title{font-weight:600;font-size:.92rem;flex:1;line-height:1.4}
+.pri{padding:2px 7px;border-radius:10px;font-size:.68rem;font-weight:600;flex-shrink:0}
+.pri-high{background:#FEE2E2;color:#DC2626}.pri-medium{background:#FEF3C7;color:#D97706}.pri-low{background:#D1FAE5;color:#059669}
+.tc-desc{font-size:.83rem;color:var(--muted);margin-bottom:10px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.status-badge{padding:2px 9px;border-radius:10px;font-size:.73rem;font-weight:500}
+.sb-pending{background:#F1F5F9;color:#64748B}.sb-in_progress{background:#FEF3C7;color:#D97706}
+.sb-completed{background:#D1FAE5;color:#059669}.sb-overdue{background:#FEE2E2;color:#DC2626}
+.tc-timer{display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--muted);margin-top:6px}
+.tc-timer.overdue{color:var(--danger);font-weight:600}.tc-timer.warn{color:var(--warning);font-weight:600}
+.tc-timer.running{color:var(--success)}
+.tc-assignee{display:flex;align-items:center;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid var(--border)}
+.tc-assignee span{font-size:.83rem;color:var(--muted)}
+.empty{grid-column:1/-1;text-align:center;padding:50px;color:var(--muted)}
+.empty .ico{font-size:2.8rem;margin-bottom:10px}
+/* Modal */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:#fff;border-radius:14px;padding:26px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-title{font-size:1.1rem;font-weight:600;margin-bottom:18px}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+.td-section{margin-bottom:13px}
+.td-section label{font-size:.73rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:block;margin-bottom:3px}
+.td-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px}
+.countdown-box{font-family:monospace;font-size:1.8rem;font-weight:700;text-align:center;padding:14px;border-radius:var(--r);background:var(--bg);margin:10px 0}
+.countdown-box.overdue{color:var(--danger)}.countdown-box.warn{color:var(--warning)}.countdown-box.ok{color:var(--primary)}
+.work-box{text-align:center;padding:14px;background:var(--bg);border-radius:var(--r);margin:10px 0}
+.work-label{font-size:.78rem;color:var(--muted);margin-bottom:4px}
+.work-val{font-family:monospace;font-size:1.7rem;font-weight:700;color:var(--primary)}
+.timer-btns{display:flex;gap:8px;justify-content:center;margin-top:8px}
+.notif-wrap{position:fixed;top:66px;right:16px;z-index:300;display:flex;flex-direction:column;gap:7px;pointer-events:none}
+.notif{background:#fff;border-radius:var(--r);padding:11px 15px;box-shadow:var(--shadow-md);border-left:4px solid var(--primary);max-width:280px;font-size:.87rem;animation:slidein .3s ease}
+.notif.success{border-color:var(--success)}.notif.warning{border-color:var(--warning)}.notif.error{border-color:var(--danger)}
+@keyframes slidein{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+.loading{display:flex;align-items:center;justify-content:center;height:180px;color:var(--muted);grid-column:1/-1}
+.spin{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;margin-right:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.code-box{background:var(--bg);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 16px;font-family:monospace;font-size:1.8rem;letter-spacing:.25em;text-align:center;margin:12px 0}
+@media(max-width:700px){.sidebar{display:none}.tasks-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="notif-wrap" id="notifWrap"></div>
+
+<!-- 欢迎页 -->
+<div id="welcome-screen" class="screen active">
+  <div class="auth-card">
+    <h1>📋 TaskSync</h1>
+    <p class="sub">实时任务协作 · 分发 · 计时 · 确认</p>
+    <div class="conn-status">
+      <div class="conn-dot connecting" id="conn-dot"></div>
+      <span id="conn-text">正在连接服务器...</span>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('create')">创建房间</button>
+      <button class="tab-btn" onclick="switchTab('join')">加入房间</button>
+    </div>
+    <div id="tab-create" class="tab-panel active">
+      <div class="fg"><label>您的名字</label><input id="c-name" placeholder="输入姓名"></div>
+      <div class="fg"><label>房间名称</label><input id="c-room" placeholder="例：产品冲刺会议"></div>
+      <button class="btn btn-primary" onclick="createRoom()">创建房间（我是管理员）</button>
+    </div>
+    <div id="tab-join" class="tab-panel">
+      <div class="fg"><label>您的名字</label><input id="j-name" placeholder="输入姓名"></div>
+      <div class="fg"><label>房间码</label>
+        <input id="j-code" placeholder="输入6位房间码" maxlength="6" style="text-transform:uppercase;letter-spacing:.2em;font-size:1.1rem">
+      </div>
+      <button class="btn btn-primary" onclick="joinRoom()">加入房间</button>
+    </div>
+  </div>
+</div>
+
+<!-- 主应用 -->
+<div id="app-screen" class="screen">
+  <header class="app-header">
+    <div class="logo">📋 TaskSync</div>
+    <div class="room-tag" onclick="showRoomCode()">
+      <span>房间:</span>
+      <strong id="h-room-name">—</strong>
+      <span id="h-room-code" style="font-family:monospace;font-size:.78rem;color:var(--primary)">—</span>
+    </div>
+    <div class="h-spacer"></div>
+    <div class="prog-wrap">
+      <div class="prog-bar"><div class="prog-fill" id="prog-fill"></div></div>
+      <span id="prog-text">0/0</span>
+    </div>
+    <div class="global-timer" id="global-timer">⏱ 00:00:00</div>
+    <div class="user-tag">
+      <div class="avatar" id="u-avatar">U</div>
+      <span id="u-name">用户</span>
+      <span class="badge" id="admin-badge" style="display:none">管理员</span>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="leaveRoom()">离开</button>
+  </header>
+  <div class="app-body">
+    <aside class="sidebar">
+      <div class="s-title">任务视图</div>
+      <div class="s-item active" onclick="setFilter('all',this)">📋 全部任务 <span class="s-count" id="cnt-all">0</span></div>
+      <div class="s-item" onclick="setFilter('pending',this)">⏳ 待处理 <span class="s-count" id="cnt-pending">0</span></div>
+      <div class="s-item" onclick="setFilter('in_progress',this)">🔄 进行中 <span class="s-count" id="cnt-in_progress">0</span></div>
+      <div class="s-item" onclick="setFilter('overdue',this)">🚨 已超时 <span class="s-count" id="cnt-overdue">0</span></div>
+      <div class="s-item" onclick="setFilter('completed',this)">✅ 已完成 <span class="s-count" id="cnt-completed">0</span></div>
+      <div class="s-item" onclick="setFilter('mine',this)">👤 我的任务 <span class="s-count" id="cnt-mine">0</span></div>
+      <div class="s-title">在线成员 (<span id="online-count">0</span>)</div>
+      <div id="members-list"></div>
+    </aside>
+    <main class="main-content">
+      <div class="content-header">
+        <h2 id="view-title">全部任务</h2>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary btn-sm" id="add-btn" onclick="openAddTask()" style="display:none">+ 新任务</button>
+      </div>
+      <div class="tasks-grid" id="tasks-grid">
+        <div class="loading"><div class="spin"></div>等待数据...</div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- 新建任务 -->
+<div class="overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-title">➕ 创建新任务</div>
+    <div class="fg"><label>任务标题 *</label><input id="t-title" placeholder="简洁描述任务"></div>
+    <div class="fg"><label>任务描述</label><textarea id="t-desc" placeholder="详细要求、验收标准..."></textarea></div>
+    <div class="fg"><label>分配给</label><select id="t-assignee"><option value="">— 未分配 —</option></select></div>
+    <div class="fg"><label>优先级</label>
+      <select id="t-priority"><option value="medium">中等</option><option value="high">高</option><option value="low">低</option></select>
+    </div>
+    <div class="fg"><label>截止时间</label><input type="datetime-local" id="t-deadline"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('addModal')">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="addTask()">创建任务</button>
+    </div>
+  </div>
+</div>
+
+<!-- 任务详情 -->
+<div class="overlay" id="detailModal">
+  <div class="modal">
+    <div id="detail-content"></div>
+    <div class="modal-footer" id="detail-footer"></div>
+  </div>
+</div>
+
+<!-- 房间码 -->
+<div class="overlay" id="codeModal">
+  <div class="modal" style="max-width:340px;text-align:center">
+    <div class="modal-title">🔗 邀请成员加入</div>
+    <p style="color:var(--muted);font-size:.88rem;margin-bottom:4px">将房间码发给队友，或分享访问地址</p>
+    <div class="code-box" id="code-display">—</div>
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:12px">访问地址：<strong id="server-url" style="color:var(--primary)">—</strong></p>
+    <button class="btn btn-primary btn-sm" style="width:100%" onclick="copyCode()">复制房间码</button>
+    <div class="modal-footer" style="justify-content:center;margin-top:10px">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('codeModal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ── 状态 ──────────────────────────────────────────
+let socket, me = null, room = null;
+let tasks = {}, members = {};
+let curFilter = 'all';
+let sessionStart = Date.now();
+let _detailId = null;
+let notified = new Set();
+
+const COLORS = ['#6366F1','#8B5CF6','#EC4899','#EF4444','#F97316','#10B981','#06B6D4','#3B82F6'];
+function randColor(){ return COLORS[Math.floor(Math.random()*COLORS.length)]; }
+function uid(n=8){ const c='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjklmnpqrstuvwxyz23456789'; let r=''; for(let i=0;i<n;i++) r+=c[Math.floor(Math.random()*c.length)]; return r; }
+function roomCode(){ const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r=''; for(let i=0;i<6;i++) r+=c[Math.floor(Math.random()*c.length)]; return r; }
+
+// ── Socket 初始化 ─────────────────────────────────
+window.onload = function() {
+  socket = io();
+
+  socket.on('connect', function() {
+    el('conn-dot').className = 'conn-dot connected';
+    el('conn-text').textContent = '已连接服务器，可以开始使用';
+    el('server-url').textContent = location.host;
+  });
+
+  socket.on('disconnect', function() {
+    el('conn-dot').className = 'conn-dot';
+    el('conn-text').textContent = '连接已断开，正在重连...';
+    notify('与服务器断开连接，正在重连...', 'warning');
+  });
+
+  socket.on('reconnect', function() {
+    notify('已重新连接！', 'success');
+    el('conn-dot').className = 'conn-dot connected';
+    el('conn-text').textContent = '已重新连接';
+    // 重新加入房间
+    if (me && room) {
+      socket.emit('join-room', { code: room.code, user: me });
+    }
+  });
+
+  socket.on('room-state', function(state) {
+    tasks = state.tasks || {};
+    members = state.members || {};
+    renderAll();
+  });
+
+  socket.on('task-update', function(newTasks) {
+    tasks = newTasks || {};
+    renderTasks(); updateCounts(); checkOverdue();
+  });
+
+  socket.on('member-update', function(newMembers) {
+    members = newMembers || {};
+    renderMembers(); updateAssignSel();
+  });
+
+  socket.on('error-msg', function(msg) { notify(msg, 'error'); });
+};
+
+// ── 房间 ──────────────────────────────────────────
+function createRoom() {
+  var name = v('c-name'), rname = v('c-room');
+  if (!name || !rname) { notify('请填写名字和房间名称','error'); return; }
+  var code = roomCode(), userId = uid();
+  me = { id:userId, name:name, color:randColor(), isAdmin:true };
+  room = { id:code, name:rname, code:code };
+  socket.emit('create-room', {
+    code: code,
+    meta: { name:rname, createdAt:Date.now() },
+    user: me
+  });
+  enterApp();
+  setTimeout(function(){ el('code-display').textContent = code; openModal('codeModal'); }, 300);
+}
+
+function joinRoom() {
+  var name = v('j-name'), code = v('j-code').toUpperCase();
+  if (!name || !code) { notify('请填写名字和房间码','error'); return; }
+  var userId = uid();
+  me = { id:userId, name:name, color:randColor(), isAdmin:false };
+  socket.emit('check-room', code, function(res) {
+    if (!res.exists) { notify('房间不存在，请检查房间码','error'); return; }
+    room = { id:code, name:res.name, code:code };
+    socket.emit('join-room', { code:code, user:me });
+    enterApp();
+  });
+}
+
+function enterApp() {
+  el('h-room-name').textContent = room.name;
+  el('h-room-code').textContent = '['+room.code+']';
+  el('code-display').textContent = room.code;
+  el('u-name').textContent = me.name;
+  el('u-avatar').textContent = me.name[0].toUpperCase();
+  el('u-avatar').style.background = me.color;
+  if (me.isAdmin) { el('admin-badge').style.display='inline'; el('add-btn').style.display='inline-flex'; }
+  sessionStart = Date.now();
+  setInterval(tickGlobal, 1000);
+  setInterval(tickTimers, 1000);
+  show('app-screen');
+  if ('Notification' in window && Notification.permission==='default') Notification.requestPermission();
+}
+
+function leaveRoom() {
+  if (!confirm('确定离开房间吗？')) return;
+  socket.disconnect();
+  location.reload();
+}
+
+// ── 任务操作 ──────────────────────────────────────
+function addTask() {
+  var title = v('t-title');
+  if (!title) { notify('请输入任务标题','error'); return; }
+  var aId = v('t-assignee'), prio = v('t-priority'), dl = v('t-deadline');
+  var am = aId ? members[aId] : null;
+  var tid = uid(10);
+  var task = {
+    id:tid, title:title, description:v('t-desc'),
+    assignedTo:aId||null, assigneeName:am?am.name:null, assigneeColor:am?am.color:null,
+    createdBy:me.id, createdByName:me.name, createdAt:Date.now(),
+    deadline: dl ? new Date(dl).getTime() : null,
+    status:'pending', priority:prio, timeSpent:0, workStartedAt:null
+  };
+  socket.emit('task-add', task);
+  closeModal('addModal'); clearForm(); notify('任务"'+title+'"已创建','success');
+}
+
+function patchTask(taskId, updates) {
+  socket.emit('task-patch', { taskId:taskId, updates:updates });
+}
+
+function startWork(taskId) {
+  patchTask(taskId, { status:'in_progress', workStartedAt:Date.now() });
+  notify('开始计时！','success'); refreshDetail(taskId);
+}
+
+function pauseWork(taskId) {
+  var t = tasks[taskId]; if (!t||!t.workStartedAt) return;
+  patchTask(taskId, {
+    status:'pending', workStartedAt:null,
+    timeSpent:(t.timeSpent||0)+Math.floor((Date.now()-t.workStartedAt)/1000)
+  }); refreshDetail(taskId);
+}
+
+function completeTask(taskId) {
+  var t = tasks[taskId]; if (!t) return;
+  patchTask(taskId, {
+    status:'completed', completedAt:Date.now(), workStartedAt:null,
+    confirmedBy:me.id, confirmedByName:me.name, confirmedAt:Date.now(),
+    timeSpent:(t.timeSpent||0)+(t.workStartedAt?Math.floor((Date.now()-t.workStartedAt)/1000):0)
+  });
+  closeModal('detailModal'); notify('任务已完成！','success');
+}
+
+function deleteTask(taskId) {
+  if (!confirm('确定删除？')) return;
+  socket.emit('task-delete', taskId);
+  closeModal('detailModal'); notify('任务已删除','warning');
+}
+
+// ── 渲染 ──────────────────────────────────────────
+function renderAll() { renderTasks(); renderMembers(); updateCounts(); checkOverdue(); }
+
+function renderTasks() {
+  var grid = el('tasks-grid');
+  var list = Object.values(tasks);
+  list.forEach(function(t){ t._over = !!(t.deadline && Date.now()>t.deadline && t.status!=='completed'); });
+  if (curFilter==='mine') list = list.filter(function(t){ return t.assignedTo===me.id; });
+  else if (curFilter==='overdue') list = list.filter(function(t){ return t._over; });
+  else if (curFilter!=='all') list = list.filter(function(t){ return t.status===curFilter; });
+  if (!list.length) {
+    grid.innerHTML = '<div class="empty"><div class="ico">📭</div><p>暂无任务</p>' +
+      (me.isAdmin&&curFilter==='all'?'<p style="margin-top:8px;font-size:.85rem">点右上角「+ 新任务」开始</p>':'') + '</div>';
+    return;
+  }
+  var po = {high:0,medium:1,low:2};
+  list.sort(function(a,b){
+    if (a._over!==b._over) return a._over?-1:1;
+    if (po[a.priority]!==po[b.priority]) return po[a.priority]-po[b.priority];
+    if (a.deadline&&b.deadline) return a.deadline-b.deadline;
+    return b.createdAt-a.createdAt;
+  });
+  grid.innerHTML = list.map(taskCard).join('');
+}
+
+function taskCard(t) {
+  var over = t._over;
+  var sc = over?'s-overdue':'s-'+t.status;
+  var sl = over?'已超时':{pending:'待处理',in_progress:'进行中',completed:'已完成'}[t.status];
+  var sb = over?'sb-overdue':'sb-'+t.status;
+  var pl = {high:'高',medium:'中',low:'低'}[t.priority];
+  var timerHtml = '';
+  if (t.deadline && t.status!=='completed') {
+    var rem = t.deadline - Date.now();
+    timerHtml = '<div class="tc-timer '+(over?'overdue':rem<3600000?'warn':'')+'" id="ct-'+t.id+'">' +
+      (over?'⚠️ 超时 '+fcd(Math.abs(rem)):'⏰ 剩余 '+fcd(rem)) + '</div>';
+  }
+  var workHtml = '';
+  if (t.status==='in_progress' && t.workStartedAt) {
+    var tot = (t.timeSpent||0)+Math.floor((Date.now()-t.workStartedAt)/1000);
+    workHtml = '<div class="tc-timer running" id="wt-'+t.id+'">▶ 进行中 '+fd(tot)+'</div>';
+  } else if (t.timeSpent>0) {
+    workHtml = '<div class="tc-timer">⏱ 用时 '+fd(t.timeSpent)+'</div>';
+  }
+  var aHtml = t.assigneeName ?
+    '<div class="tc-assignee"><div class="avatar" style="background:'+esc(t.assigneeColor||'#6366F1')+';width:22px;height:22px;font-size:.68rem">'+t.assigneeName[0]+'</div><span>'+esc(t.assigneeName)+'</span></div>' : '';
+  return '<div class="task-card '+sc+'" onclick="openDetail(\''+t.id+'\')">'+
+    '<div class="tc-head"><div class="tc-title">'+esc(t.title)+'</div><div class="pri pri-'+t.priority+'">'+pl+'</div></div>'+
+    (t.description?'<div class="tc-desc">'+esc(t.description)+'</div>':'')+
+    '<div><span class="status-badge '+sb+'">'+sl+'</span></div>'+
+    timerHtml+workHtml+aHtml+'</div>';
+}
+
+function renderMembers() {
+  var list = Object.values(members);
+  var online = list.filter(function(m){ return m.online; }).length;
+  el('online-count').textContent = online;
+  el('members-list').innerHTML = list.map(function(m){
+    return '<div class="member-item">'+
+      '<div class="avatar" style="background:'+m.color+';width:22px;height:22px;font-size:.68rem">'+m.name[0]+'</div>'+
+      '<span>'+esc(m.name)+'</span>'+
+      (m.isAdmin?'<span style="font-size:.68rem;color:var(--primary)">管</span>':'')+
+      '<div class="online-dot '+(m.online?'on':'off')+'"></div></div>';
+  }).join('');
+}
+
+function updateAssignSel() {
+  var s = el('t-assignee'); if (!s) return;
+  s.innerHTML = '<option value="">— 未分配 —</option>' +
+    Object.values(members).map(function(m){ return '<option value="'+m.id+'">'+esc(m.name)+'</option>'; }).join('');
+}
+
+function updateCounts() {
+  var list = Object.values(tasks), now = Date.now();
+  var c = {
+    all:list.length,
+    pending:list.filter(function(t){return t.status==='pending';}).length,
+    in_progress:list.filter(function(t){return t.status==='in_progress';}).length,
+    overdue:list.filter(function(t){return t.deadline&&now>t.deadline&&t.status!=='completed';}).length,
+    completed:list.filter(function(t){return t.status==='completed';}).length,
+    mine:list.filter(function(t){return t.assignedTo===me.id;}).length
+  };
+  Object.keys(c).forEach(function(k){ var e=el('cnt-'+k); if(e) e.textContent=c[k]; });
+  var pct = c.all>0?Math.round(c.completed/c.all*100):0;
+  el('prog-fill').style.width = pct+'%';
+  el('prog-text').textContent = c.completed+'/'+c.all;
+}
+
+function checkOverdue() {
+  Object.values(tasks).forEach(function(t) {
+    if (t.deadline && Date.now()>t.deadline && t.status!=='completed' && !notified.has(t.id)) {
+      notified.add(t.id);
+      notify('任务「'+t.title+'」已超时！','error');
+      if ('Notification' in window && Notification.permission==='granted')
+        new Notification('任务超时',{body:'「'+t.title+'」已超过截止时间'});
+    }
+  });
+}
+
+// ── 任务详情 ──────────────────────────────────────
+function openDetail(tid) { _detailId=tid; renderDetail(tid); openModal('detailModal'); }
+function refreshDetail(tid) { if(_detailId===tid) renderDetail(tid); }
+
+function renderDetail(tid) {
+  var t = tasks[tid]; if (!t) return;
+  var over = !!(t.deadline && Date.now()>t.deadline && t.status!=='completed');
+  var sl = over?'⚠️ 已超时':{pending:'⏳ 待处理',in_progress:'🔄 进行中',completed:'✅ 已完成'}[t.status];
+  var canAct = me.isAdmin || t.assignedTo===me.id;
+  var ws = (t.timeSpent||0)+(t.workStartedAt?Math.floor((Date.now()-t.workStartedAt)/1000):0);
+  var cdHtml = '';
+  if (t.deadline) {
+    var rem = t.deadline-Date.now(), cls = over?'overdue':rem<3600000?'warn':'ok';
+    cdHtml = '<div class="td-section"><label>截止倒计时</label>' +
+      '<div class="countdown-box '+cls+'" id="d-cd">'+(over?'⚠️ 超时 '+fcd(Math.abs(rem)):fcd(rem))+'</div></div>';
+  }
+  var wkHtml = '';
+  if (t.status!=='completed' && canAct) {
+    wkHtml = '<div class="work-box"><div class="work-label">工作计时器</div>' +
+      '<div class="work-val" id="d-wt">'+fd(ws)+'</div><div class="timer-btns">' +
+      (t.status==='in_progress'
+        ?'<button class="btn btn-secondary btn-sm" onclick="pauseWork(\''+tid+'\')">⏸ 暂停</button>'
+        :'<button class="btn btn-success btn-sm" onclick="startWork(\''+tid+'\')">▶ 开始工作</button>') +
+      '</div></div>';
+  } else if (ws>0) {
+    wkHtml = '<div class="work-box"><div class="work-label">总用时</div><div class="work-val">'+fd(ws)+'</div></div>';
+  }
+  el('detail-content').innerHTML =
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">'+
+    '<h2 style="font-size:1.1rem;font-weight:600;flex:1">'+esc(t.title)+'</h2>'+
+    '<div class="pri pri-'+t.priority+'" style="margin-left:8px">'+{high:'高优',medium:'中优',low:'低优'}[t.priority]+'</div></div>'+
+    (t.description?'<div class="td-section"><label>任务描述</label><p style="font-size:.9rem;line-height:1.6">'+esc(t.description)+'</p></div>':'')+
+    '<div class="td-grid">'+
+    '<div class="td-section"><label>状态</label><p>'+sl+'</p></div>'+
+    '<div class="td-section"><label>创建者</label><p>'+esc(t.createdByName||'—')+'</p></div>'+
+    '<div class="td-section"><label>负责人</label><p>'+(t.assigneeName?
+      '<span style="display:flex;align-items:center;gap:5px"><span class="avatar" style="background:'+esc(t.assigneeColor)+';width:20px;height:20px;font-size:.65rem">'+t.assigneeName[0]+'</span>'+esc(t.assigneeName)+'</span>'
+      :'未分配')+'</p></div>'+
+    (t.deadline?'<div class="td-section"><label>截止时间</label><p style="font-size:.88rem">'+new Date(t.deadline).toLocaleString('zh-CN')+'</p></div>':'')+
+    '</div>'+cdHtml+wkHtml+
+    (t.confirmedByName?'<div class="td-section" style="margin-top:10px"><label>确认信息</label>'+
+      '<p style="font-size:.88rem">由 '+esc(t.confirmedByName)+' 于 '+new Date(t.confirmedAt).toLocaleString('zh-CN')+' 确认完成</p></div>':'');
+  var btns = '<button class="btn btn-secondary btn-sm" onclick="closeModal(\'detailModal\')">关闭</button>';
+  if (t.status!=='completed' && canAct) btns += '<button class="btn btn-success btn-sm" onclick="completeTask(\''+tid+'\')">✅ 完成任务</button>';
+  if (me.isAdmin) btns += '<button class="btn btn-danger btn-sm" onclick="deleteTask(\''+tid+'\')">删除</button>';
+  el('detail-footer').innerHTML = btns;
+}
+
+// ── 计时器 ────────────────────────────────────────
+function tickGlobal() {
+  el('global-timer').textContent = '⏱ ' + fd(Math.floor((Date.now()-sessionStart)/1000));
+}
+
+function tickTimers() {
+  Object.values(tasks).forEach(function(t) {
+    if (t.deadline && t.status!=='completed') {
+      var e = el('ct-'+t.id); if (!e) return;
+      var rem = t.deadline-Date.now(), over = rem<=0;
+      e.textContent = over?'⚠️ 超时 '+fcd(Math.abs(rem)):'⏰ 剩余 '+fcd(rem);
+      e.className = 'tc-timer'+(over?' overdue':rem<3600000?' warn':'');
+    }
+    if (t.status==='in_progress' && t.workStartedAt) {
+      var e2 = el('wt-'+t.id); if (!e2) return;
+      e2.textContent = '▶ 进行中 '+fd((t.timeSpent||0)+Math.floor((Date.now()-t.workStartedAt)/1000));
+    }
+  });
+  if (_detailId) {
+    var t2 = tasks[_detailId]; if (!t2) return;
+    if (t2.deadline) {
+      var e3 = el('d-cd'); if (e3) {
+        var rem2 = t2.deadline-Date.now(), ov = rem2<=0;
+        e3.textContent = ov?'⚠️ 超时 '+fcd(Math.abs(rem2)):fcd(rem2);
+        e3.className = 'countdown-box'+(ov?' overdue':rem2<3600000?' warn':' ok');
+      }
+    }
+    if (t2.workStartedAt) { var e4=el('d-wt'); if(e4) e4.textContent=fd((t2.timeSpent||0)+Math.floor((Date.now()-t2.workStartedAt)/1000)); }
+  }
+  updateCounts(); checkOverdue();
+}
+
+// ── UI ────────────────────────────────────────────
+function switchTab(t) {
+  document.querySelectorAll('.tab-btn').forEach(function(b,i){ b.classList.toggle('active', i===(t==='create'?0:1)); });
+  document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+  el('tab-'+t).classList.add('active');
+}
+function setFilter(f,btn) {
+  curFilter=f;
+  document.querySelectorAll('.s-item').forEach(function(i){ i.classList.remove('active'); });
+  btn.classList.add('active');
+  var lbl={all:'全部任务',pending:'待处理',in_progress:'进行中',overdue:'已超时',completed:'已完成',mine:'我的任务'};
+  el('view-title').textContent = lbl[f]||f;
+  renderTasks();
+}
+function openAddTask() { updateAssignSel(); openModal('addModal'); }
+function openModal(id) { el(id).classList.add('open'); }
+function closeModal(id) { el(id).classList.remove('open'); if(id==='detailModal') _detailId=null; }
+function showRoomCode() { el('code-display').textContent=room.code; el('server-url').textContent=location.host; openModal('codeModal'); }
+function copyCode() { navigator.clipboard.writeText(room.code).then(function(){ notify('房间码已复制！','success'); }); }
+function clearForm() { ['t-title','t-desc','t-deadline'].forEach(function(id){ var e=el(id); if(e) e.value=''; }); }
+function show(id) { document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); }); el(id).classList.add('active'); }
+function v(id) { var e=el(id); return e?e.value.trim():''; }
+function el(id) { return document.getElementById(id); }
+function esc(s) { if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fd(s) {
+  s=Math.max(0,Math.floor(s));
+  var h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+  if(h>0) return h+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+  return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+}
+function fcd(ms) {
+  var s=Math.floor(Math.abs(ms)/1000);
+  var d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60),sec=s%60;
+  if(d>0) return d+'天'+h+'时'+m+'分';
+  if(h>0) return h+'时'+m+'分'+sec+'秒';
+  return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+}
+function notify(msg, type) {
+  var d=document.createElement('div');
+  d.className='notif '+(type||'info'); d.textContent=msg;
+  el('notifWrap').appendChild(d);
+  setTimeout(function(){ d.remove(); }, 4000);
+}
+document.querySelectorAll('.overlay').forEach(function(o){
+  o.addEventListener('click', function(e){ if(e.target===o){o.classList.remove('open');_detailId=null;} });
+});
+</script>
+</body>
+</html>
